@@ -436,3 +436,43 @@ def test_repetition_operator_many_times_same():
     input_str = '2 b  3 b, b'
     result = p.parse(input_str)
     assert result == ["2", ["b"], "3", ["b", "b"], None]
+
+
+def test_assignment_plain():
+    """
+    Test plain assignment.
+    """
+
+    grammar = """
+    S: "1" first=some_match "3";
+    some_match: "2";
+    """
+
+    g = Grammar.from_string(grammar)
+
+    p = Parser(g)
+
+    input_str = '1 2 3'
+
+    result = p.parse(input_str)
+    assert result == ["1", "2", "3"]
+
+
+def test_assignment_bool():
+    """
+    Test bool assignment.
+    """
+
+    grammar = """
+    S: "1" first?=some_match "3";
+    some_match: "2";
+    """
+
+    g = Grammar.from_string(grammar)
+
+    p = Parser(g)
+
+    input_str = '1 2 3'
+
+    result = p.parse(input_str)
+    assert result == ["1", "2", "3"]

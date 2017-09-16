@@ -502,6 +502,11 @@ class Grammar(object):
  TERM_DIS_RULE,
  TERM_DIS_RULES,
 
+ ASSIGNMENT,
+ ASSIGNMENTS,
+ PLAIN_ASSIGNMENT,
+ BOOL_ASSIGNMENT,
+
  REPEATABLE_GSYMBOL,
  REPEATABLE_GSYMBOLS,
  OPT_REP_OPERATOR,
@@ -513,7 +518,6 @@ class Grammar(object):
  OPT_REP_MODIFIER,
 
  GSYMBOL,
- GSYMBOLS,
  RECOGNIZER,
  LAYOUT,
  LAYOUT_ITEM,
@@ -532,6 +536,11 @@ class Grammar(object):
      'TerminalDisambiguationRule',
      'TerminalDisambiguationRules',
 
+     'Assignment',
+     'Assignments',
+     'PlainAssignment',
+     'BoolAssignment',
+
      'RepeatableGrammarSymbol',
      'RepeatableGrammarSymbols',
      'OptRepeatOperator',
@@ -543,7 +552,6 @@ class Grammar(object):
      'OptionalRepeatModifier',
 
      'GrammarSymbol',
-     'GrammarSymbols',
      'Recognizer',
      'LAYOUT',
      'LAYOUT_ITEM',
@@ -584,8 +592,8 @@ pg_productions = [
     [PRODUCTION_RULE_RHS, [PRODUCTION_RULE_RHS, '|', PRODUCTION],
      ASSOC_LEFT, 5],
     [PRODUCTION_RULE_RHS, [PRODUCTION], ASSOC_LEFT, 5],
-    [PRODUCTION, [REPEATABLE_GSYMBOLS]],
-    [PRODUCTION, [REPEATABLE_GSYMBOLS, '{', PROD_DIS_RULES, '}']],
+    [PRODUCTION, [ASSIGNMENTS]],
+    [PRODUCTION, [ASSIGNMENTS, '{', PROD_DIS_RULES, '}']],
 
     [TERMINAL_RULE, [NAME, ':', RECOGNIZER, ';'], ASSOC_LEFT, 15],
     [TERMINAL_RULE, [NAME, ':', ';'], ASSOC_LEFT, 15],
@@ -608,10 +616,17 @@ pg_productions = [
     [TERM_DIS_RULES, [TERM_DIS_RULES, ',', TERM_DIS_RULE]],
     [TERM_DIS_RULES, [TERM_DIS_RULE]],
 
+    # Assignments
+    [ASSIGNMENT, [PLAIN_ASSIGNMENT]],
+    [ASSIGNMENT, [BOOL_ASSIGNMENT]],
+    [ASSIGNMENT, [REPEATABLE_GSYMBOL]],
+    [ASSIGNMENTS, [ASSIGNMENTS, ASSIGNMENT]],
+    [ASSIGNMENTS, [ASSIGNMENT]],
+    [PLAIN_ASSIGNMENT, [NAME, '=', REPEATABLE_GSYMBOL]],
+    [BOOL_ASSIGNMENT, [NAME, '?=', REPEATABLE_GSYMBOL]],
+
     # Regex-like repeat operators
     [REPEATABLE_GSYMBOL, [GSYMBOL, OPT_REP_OPERATOR]],
-    [REPEATABLE_GSYMBOLS, [REPEATABLE_GSYMBOLS, REPEATABLE_GSYMBOL]],
-    [REPEATABLE_GSYMBOLS, [REPEATABLE_GSYMBOL]],
     [OPT_REP_OPERATOR, [REP_OPERATOR_ZERO]],
     [OPT_REP_OPERATOR, [REP_OPERATOR_ONE]],
     [OPT_REP_OPERATOR, [REP_OPERATOR_OPTIONAL]],
@@ -627,7 +642,6 @@ pg_productions = [
 
     [GSYMBOL, [NAME]],
     [GSYMBOL, [RECOGNIZER]],
-    [GSYMBOLS, [GSYMBOL]],
     [RECOGNIZER, [STR_TERM]],
     [RECOGNIZER, [REGEX_TERM]],
 
@@ -766,6 +780,16 @@ def act_term_rule_empty_body(_, nodes):
     return [Production(term, ProductionRHS([]))]
 
 
+def act_assignment(context, nodes):
+    elem = nodes[0]
+    if type(elem) is list:
+        # TODO: Implement support for assignments
+        name, assign_op, gsymbol = elem
+        return gsymbol
+    else:
+        return elem
+
+
 def act_repeatable_gsymbol(context, nodes):
     if len(nodes) > 1:
         gsymbol, rep_op = nodes
@@ -883,10 +907,12 @@ pg_actions = {
     "ProductionDisambiguationRules": collect_sep,
     "TerminalDisambiguationRules": collect_sep,
 
+    "Assignment": act_assignment,
+    "Assignments": collect,
+
     'RepeatableGrammarSymbol': act_repeatable_gsymbol,
     'RepeatableGrammarSymbols': collect,
 
-    'GrammarSymbols': collect,
     'GrammarSymbol': [lambda _, nodes: Reference(nodes[0]),
                       pass_single],
 
