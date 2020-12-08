@@ -6,8 +6,6 @@
 # Copyright: (c) 2017 Igor R. Dejanovic <igor DOT dejanovic AT gmail DOT com>
 # License: MIT License
 #######################################################################
-from __future__ import print_function, unicode_literals
-
 import time
 from os.path import dirname, join, getsize
 from parglare import Grammar
@@ -33,7 +31,7 @@ def timeit(parser_class, file_name, message, **kwargs):
           'KB/sec\n')
 
 
-def run_tests(parser_class):
+def run_tests(parser_class, **kwargs):
 
     # Small file
     file_name_small = 'LightSwitch.rpy'
@@ -43,17 +41,15 @@ def run_tests(parser_class):
     # Without semantic actions
     for i in range(3):
         timeit(parser_class, file_name_small,
-               '{}. Small file without sem. actions.'.format(i + 1),
-               default_actions=False)
+               '{}. Small file without tree building.'.format(i + 1), **kwargs)
         timeit(parser_class, file_name_large,
-               '{}. Large file without sem. actions.'.format(i + 1),
-               default_actions=False)
+               '{}. Large file without tree building.'.format(i + 1), **kwargs)
 
-    # With default semantic actions.
+    # With tree building.
     for i in range(3):
         timeit(parser_class, file_name_small,
-               '{}. Small file with default semantic actions.'.format(i + 1),
-               default_actions=True)
+               '{}. Small file with tree building.'.format(i + 1),
+               build_tree=True, **kwargs)
         timeit(parser_class, file_name_large,
-               '{}. Large file with default semantic actions.'.format(i + 1),
-               default_actions=True)
+               '{}. Large file with tree building.'.format(i + 1),
+               build_tree=True, **kwargs)

@@ -24,23 +24,25 @@ The whole expression evaluator is done in under 30 lines of code!
 
     grammar = r"""
     E: E '+' E  {left, 1}
-    | E '-' E  {left, 1}
-    | E '*' E  {left, 2}
-    | E '/' E  {left, 2}
-    | E '^' E  {right, 3}
-    | '(' E ')'
-    | number;
+     | E '-' E  {left, 1}
+     | E '*' E  {left, 2}
+     | E '/' E  {left, 2}
+     | E '^' E  {right, 3}
+     | '(' E ')'
+     | number;
+
+    terminals
     number: /\d+(\.\d+)?/;
     """
 
     actions = {
-        "E": [lambda _, nodes: nodes[0] + nodes[2],
-              lambda _, nodes: nodes[0] - nodes[2],
-              lambda _, nodes: nodes[0] * nodes[2],
-              lambda _, nodes: nodes[0] / nodes[2],
-              lambda _, nodes: nodes[0] ** nodes[2],
-              lambda _, nodes: nodes[1],
-              lambda _, nodes: nodes[0]],
+        "E": [lambda _, n: n[0] + n[2],
+              lambda _, n: n[0] - n[2],
+              lambda _, n: n[0] * n[2],
+              lambda _, n: n[0] / n[2],
+              lambda _, n: n[0] ** n[2],
+              lambda _, n: n[1],
+              lambda _, n: n[0]],
         "number": lambda _, value: float(value),
     }
 
@@ -52,7 +54,7 @@ The whole expression evaluator is done in under 30 lines of code!
     print("Result = ", result)
 
     # Output
-    # -- Debuging/tracing output with detailed info about grammar, productions,
+    # -- Debugging/tracing output with detailed info about grammar, productions,
     # -- terminals and nonterminals, DFA states, parsing progress,
     # -- and at the end of the output:
     # Result = 700.8
@@ -83,7 +85,7 @@ MIT
 Python versions
 ---------------
 
-Tested with 2.7, 3.3-3.6
+Tested with 3.4-3.8
 
 Credits
 -------
@@ -100,7 +102,7 @@ Initial layout/content of this package was created with `Cookiecutter
    :target: https://coveralls.io/github/igordejanovic/parglare?branch=master
 
 .. |docs| image:: https://img.shields.io/badge/docs-latest-green.svg
-   :target: http://igordejanovic.net/parglare/
+   :target: http://igordejanovic.net/parglare/latest/
 
 .. |status| image:: https://img.shields.io/pypi/status/parglare.svg
 

@@ -1,10 +1,16 @@
-sudo: false
 language: python
 python:
-    - "2.7"
-    - "3.3"
     - "3.4"
     - "3.5"
     - "3.6"
-install: pip install -U tox-travis
-script: tox
+    - "3.7"
+    - "3.8"
+
+install:
+    - ./install-test.sh
+
+script:
+    - ./runtests.sh
+
+after_success:
+    - coveralls

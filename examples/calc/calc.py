@@ -1,8 +1,7 @@
-from __future__ import unicode_literals
 from parglare import Grammar, Parser
-from parglare.actions import pass_inner, pass_single, pass_nochange
+from parglare.actions import pass_inner, pass_single
 
-grammar = """
+grammar = r"""
 Calc: Assignments E;
 Assignments: Assignment | Assignments Assignment | EMPTY;
 Assignment: VariableName "=" Number;
@@ -18,6 +17,7 @@ E: E "+" E {left, 1}
 
 VariableRef: VariableName;
 
+terminals
 VariableName: /[a-zA-Z_][_a-zA-Z0-9]*/;
 Number: /\d+(\.\d+)?/;
 """
@@ -30,14 +30,14 @@ def act_assignment(context, nodes):
     name = nodes[0]
     number = nodes[2]
 
-    if not hasattr(context, 'variables'):
-        context.variables = {}
+    if context.extra is None:
+        context.extra = {}
 
-    context.variables[name] = number
+    context.extra[name] = number
 
 
 actions = {
-    "Calc": pass_inner,
+    "Calc": lambda _, nodes: nodes[1],
     "Assignment": act_assignment,
     "E": [lambda _, nodes: nodes[0] + nodes[2],
           lambda _, nodes: nodes[0] - nodes[2],
@@ -47,14 +47,13 @@ actions = {
           pass_single,
           pass_single],
     "Number": lambda _, value: float(value),
-    "VariableName": pass_nochange,
-    "VariableRef": lambda context, nodes: context.variables[nodes[0]],
+    "VariableRef": lambda context, nodes: context.extra[nodes[0]],
 }
 
 
 def main(debug=False):
-    g = Grammar.from_string(grammar)
-    parser = Parser(g, actions=actions)
+    g = Grammar.from_string(grammar, debug=debug, debug_colors=True)
+    parser = Parser(g, actions=actions, debug=debug, debug_colors=True)
 
     input_str = """
     a = 5

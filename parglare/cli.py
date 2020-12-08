@@ -1,89 +1,132 @@
 #!/usr/bin/env python
-from __future__ import unicode_literals, print_function
 import sys
-import argparse
+import click
 from parglare import Grammar, ParseError, GrammarError, GLRParser
 from parglare.export import grammar_pda_export
-from parglare.tables import create_table
+from parglare.tables import create_load_table
+from parglare.termui import prints, a_print, h_print
+import parglare.termui as t
 
 
-def pglr():
+@click.group()
+@click.option('--debug', default=False, is_flag=True,
+              help="Debug/trace output.")
+@click.option('--no-colors', default=False, is_flag=True,
+              help="Disable output coloring.")
+@click.option('--prefer-shifts', default=False, is_flag=True,
+              help="Prefer shifts over reductions.")
+@click.option('--prefer-shifts-over-empty',
+              default=False, is_flag=True,
+              help="Prefer shifts over empty reductions.")
+@click.pass_context
+def pglr(ctx, debug, no_colors, prefer_shifts, prefer_shifts_over_empty):
     """
-    pglr console command.
+    Command line interface for working with parglare grammars.
     """
+    ctx.obj = {'debug': debug, 'colors': not no_colors,
+               'prefer_shifts': prefer_shifts,
+               'prefer_shifts_over_empty': prefer_shifts_over_empty}
 
-    class MyParser(argparse.ArgumentParser):
-        """
-        Custom argument parser for printing help message in case of an error.
-        See http://stackoverflow.com/questions/4042452/display-help-message-with-python-argparse-when-script-is-called-without-any-argu  # noqa
-        """
-        def error(self, message):
-            sys.stderr.write('error: %s\n' % message)
-            self.print_help()
-            sys.exit(2)
 
-    commands = ['viz', 'check', 'trace']
-    commands_str = "'{}'".format("' or '".join(commands))
+@pglr.command()
+@click.argument('grammar_file', type=click.Path())
+@click.pass_context
+def compile(ctx, grammar_file):
+    debug = ctx.obj['debug']
+    colors = ctx.obj['colors']
+    prefer_shifts = ctx.obj['prefer_shifts']
+    prefer_shifts_over_empty = ctx.obj['prefer_shifts_over_empty']
+    h_print('Compiling...')
+    compile_get_grammar_table(grammar_file, debug, colors, prefer_shifts,
+                              prefer_shifts_over_empty)
 
-    parser = MyParser(description='parglare checker and visualizer')
-    parser.add_argument('cmd', help='Command - {}'.format(commands_str))
-    parser.add_argument('grammar', help='parglare grammar file')
-    parser.add_argument('input_file',
-                        help='input file for GLR trace subcommand.',
-                        nargs='?')
-    parser.add_argument('-d', help='run in debug mode',
-                        action='store_true')
-    parser.add_argument('-i',
-                        help='input_file for trace is input string, not file.',
-                        action='store_true')
 
-    args = parser.parse_args()
+@pglr.command()
+@click.argument('grammar_file', type=click.Path())
+@click.pass_context
+def viz(ctx, grammar_file):
+    debug = ctx.obj['debug']
+    colors = ctx.obj['colors']
+    prefer_shifts = ctx.obj['prefer_shifts']
+    prefer_shifts_over_empty = ctx.obj['prefer_shifts_over_empty']
+    t.colors = colors
+    grammar, table = compile_get_grammar_table(grammar_file, debug, colors,
+                                               prefer_shifts,
+                                               prefer_shifts_over_empty)
+    prints("Generating '%s.dot' file for the grammar PDA." % grammar_file)
+    prints("Use dot viewer (e.g. xdot) "
+           "or convert to pdf by running 'dot -Tpdf -O %s.dot'" % grammar_file)
+    t.colors = False
+    grammar_pda_export(table, "%s.dot" % grammar_file)
 
-    if args.cmd not in commands:
-        print("Unknown command {}. Command must be one of"
-              " {}.".format(args.cmd, commands_str))
+
+@pglr.command()
+@click.argument('grammar_file', type=click.Path())
+@click.option('--input-file', '-f', type=click.Path(),
+              help="Input file for tracing")
+@click.option('--input', '-i', help="Input string for tracing")
+@click.pass_context
+def trace(ctx, grammar_file, input_file, input):
+    if not (input_file or input):
+        prints('Expected either input_file or input string.')
         sys.exit(1)
+    colors = ctx.obj['colors']
+    prefer_shifts = ctx.obj['prefer_shifts']
+    prefer_shifts_over_empty = ctx.obj['prefer_shifts_over_empty']
+    grammar, table = compile_get_grammar_table(grammar_file, True, colors,
+                                               prefer_shifts,
+                                               prefer_shifts_over_empty)
+    parser = GLRParser(grammar, debug=True, debug_trace=True,
+                       debug_colors=colors, prefer_shifts=prefer_shifts,
+                       prefer_shifts_over_empty=prefer_shifts_over_empty)
+    if input:
+        parser.parse(input)
+    else:
+        parser.parse_file(input_file)
 
+
+def compile_get_grammar_table(grammar_file, debug, colors, prefer_shifts,
+                              prefer_shifts_over_empty):
     try:
-        g = Grammar.from_file(args.grammar, _no_check_recognizers=True)
-        if args.d:
+        g = Grammar.from_file(grammar_file, _no_check_recognizers=True,
+                              debug_colors=colors)
+        if debug:
             g.print_debug()
-        table = create_table(g)
-        if args.d:
+        table = create_load_table(
+            g, prefer_shifts=prefer_shifts,
+            prefer_shifts_over_empty=prefer_shifts_over_empty,
+            force_create=True, debug=debug)
+        if debug or table.sr_conflicts or table.rr_conflicts:
             table.print_debug()
 
-        print("Grammar OK.")
-        if table.sr_conflicts:
-            print("There are {} Shift/Reduce conflicts. "
-                  "Either use 'prefer_shifts' parser mode, try to resolve "
-                  "manually or use GLR parsing.".format(
-                      len(table.sr_conflicts)))
-        if table.rr_conflicts:
-            print("There are {} Reduce/Reduce conflicts."
-                  "Try to resolve manually or use GLR parsing.".format(
-                      len(table.rr_conflicts)))
+        if not table.sr_conflicts and not table.rr_conflicts:
+            h_print("Grammar OK.")
 
-        if (table.sr_conflicts or table.rr_conflicts) and not args.d:
-            print("Run in debug mode to print all the states.")
+        if table.sr_conflicts:
+            if len(table.sr_conflicts) == 1:
+                message = 'There is 1 Shift/Reduce conflict.'
+            else:
+                message = 'There are {} Shift/Reduce conflicts.'\
+                          .format(len(table.sr_conflicts))
+            a_print(message)
+            prints("Either use 'prefer_shifts' parser mode, try to resolve "
+                   "manually, or use GLR parsing.")
+        if table.rr_conflicts:
+            if len(table.rr_conflicts) == 1:
+                message = 'There is 1 Reduce/Reduce conflict.'
+            else:
+                message = 'There are {} Reduce/Reduce conflicts.'\
+                          .format(len(table.rr_conflicts))
+            a_print(message)
+            prints("Try to resolve manually or use GLR parsing.")
 
     except (GrammarError, ParseError) as e:
         print("Error in the grammar file.")
         print(e)
         sys.exit(1)
 
-    if args.cmd == "viz":
-        print("Generating '%s.dot' file for the grammar PDA." % args.grammar)
-        print("Use dot viewer (e.g. xdot) "
-              "or convert to pdf by running 'dot -Tpdf -O %s.dot'"
-              % args.grammar)
-        grammar_pda_export(table, "%s.dot" % args.grammar)
+    return g, table
 
-    elif args.cmd == "trace":
-        if not args.input_file:
-            print("input_file is mandatory for trace command.")
-            sys.exit(1)
-        parser = GLRParser(g, debug=True, debug_trace=True)
-        if args.i:
-            parser.parse(args.input_file)
-        else:
-            parser.parse_file(args.input_file)
+
+if __name__ == '__main__':
+    pglr()

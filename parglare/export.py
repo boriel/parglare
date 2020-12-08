@@ -1,11 +1,6 @@
-from __future__ import unicode_literals
 from parglare.parser import REDUCE, SHIFT, ACCEPT
 import codecs
-import sys
-if sys.version < '3':
-    text = unicode  # noqa
-else:
-    text = str
+from parglare import termui as t
 
 
 HEADER = '''
@@ -26,15 +21,20 @@ HEADER = '''
 
 
 def dot_escape(s):
-    return s.replace('\n', r'\n')\
-            .replace('\\', '\\\\')\
-            .replace('"', r'\"')\
-            .replace('|', r'\|')\
-            .replace('{', r'\{')\
-            .replace('}', r'\}')\
-            .replace('>', r'\>')\
-            .replace('<', r'\<')\
-            .replace('?', r'\?')
+    colors = t.colors
+    t.colors = False
+    s = str(s)
+    out = s.replace('\n', r'\n')\
+           .replace('\\', '\\\\')\
+           .replace('"', r'\"')\
+           .replace('|', r'\|')\
+           .replace('{', r'\{')\
+           .replace('}', r'\}')\
+           .replace('>', r'\>')\
+           .replace('<', r'\<')\
+           .replace('?', r'\?')
+    t.colors = colors
+    return out
 
 
 def grammar_pda_export(table, file_name):
@@ -46,11 +46,11 @@ def grammar_pda_export(table, file_name):
 
             kernel_items = ""
             for item in state.kernel_items:
-                kernel_items += "{}\\l".format(dot_escape(text(item)))
+                kernel_items += "{}\\l".format(dot_escape(str(item)))
 
             nonkernel_items = "|" if state.nonkernel_items else ""
             for item in state.nonkernel_items:
-                nonkernel_items += "{}\\l".format(dot_escape(text(item)))
+                nonkernel_items += "{}\\l".format(dot_escape(str(item)))
 
             # SHIFT actions and GOTOs will be encoded in links.
             # REDUCE actions will be presented inside each node.
@@ -85,13 +85,13 @@ def grammar_pda_export(table, file_name):
                 for a in [a for a in actions if a.action in [SHIFT, ACCEPT]]:
                     shacc.append((term, a))
             for term, action in shacc:
-                    f.write('{} -> {} [label="{}:{}"]'.format(
-                        state.state_id, action.state.state_id,
-                        "SHIFT" if action.action == SHIFT else "ACCEPT", term))
+                f.write('{} -> {} [label="{}:{}"]'.format(
+                    state.state_id, action.state.state_id,
+                    "SHIFT" if action.action == SHIFT else "ACCEPT", term))
 
             for symb, goto_state in ((symb, goto) for symb, goto
                                      in state.gotos.items()):
-                    f.write('{} -> {} [label="GOTO:{}"]'.format(
-                        state.state_id, goto_state.state_id, symb))
+                f.write('{} -> {} [label="GOTO:{}"]'.format(
+                    state.state_id, goto_state.state_id, symb))
 
         f.write("\n}\n")
